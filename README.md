@@ -1,11 +1,44 @@
 # sri-adt-mcp
 
+> **Give your AI coding agent a full SAP ABAP developer seat** — search, read, edit, activate, test, transport and debug ABAP over the Model Context Protocol.
+
+[![CI](https://github.com/srijayant/sri-adt-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/srijayant/sri-adt-mcp/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg)](package.json)
+[![MCP](https://img.shields.io/badge/Model_Context_Protocol-server-blue.svg)](https://modelcontextprotocol.io)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 sri-adt-mcp is an MCP server that gives AI coding agents (Claude Code, Cursor, Codex, VS Code Copilot, or any MCP client) the capabilities of **SAP ABAP Development Tools (ADT)**. Agents can search, read, create, edit, activate, check, test, transport and debug ABAP objects, the same as a developer in Eclipse.
 
-It runs on **SAP BTP Cloud Foundry** and reaches the ABAP system through a **BTP destination**:
+It runs on **SAP BTP Cloud Foundry** and reaches the ABAP system through a **BTP destination** — so no backend credentials ever touch the developer's machine.
 
-```
-Agent ──OAuth2 login (XSUAA)──▶ sri-adt-mcp on BTP ──SAP Cloud SDK──▶ BTP Destination ──(Cloud Connector)──▶ ABAP /sap/bc/adt/*
+## Why sri-adt-mcp
+
+- 🧠 **Any MCP client, one URL** — works with Claude Code, Cursor, Codex, VS Code Copilot, or anything that speaks MCP.
+- 🔐 **Zero credentials on the dev machine** — browser OAuth login to BTP; backend credentials stay in the destination and never leave BTP.
+- 🧰 **60+ tools spanning the whole ADT surface** — navigate, edit, activate, syntax-check, ATC, unit tests, transports, runtime, debugger, abapGit.
+- 🏢 **Enterprise-ready controls** — role-gated read vs. write, package allowlists, global read-only mode, and multiple destinations from one deployment.
+- 🚪 **No dead ends** — `adt_request` reaches any `/sap/bc/adt` endpoint your release supports, even without a dedicated tool.
+- 🪪 **Per-developer identity, optional** — flip the destination to PrincipalPropagation and every call runs as the real developer, no code change.
+
+> If this saves you from hand-wiring ADT calls, please ⭐ **star the repo** — it genuinely helps others find it.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    A["AI Agent<br/>Claude Code · Cursor · Codex · VS Code"]
+    subgraph BTP["SAP BTP — Cloud Foundry"]
+        M["sri-adt-mcp"]
+        X["XSUAA<br/>(OAuth / roles)"]
+        D["BTP Destination"]
+    end
+    S[("ABAP System<br/>/sap/bc/adt/*")]
+    A -- "MCP over HTTP" --> M
+    A -. "OAuth2 login" .-> X
+    M -- "validate JWT + scopes" --> X
+    M -- "SAP Cloud SDK" --> D
+    D -- "Cloud Connector / Internet" --> S
 ```
 
 - **No credentials on the developer's machine.** In the agent you add a URL and sign in with your BTP account in the browser. The agent handles and refreshes tokens.
@@ -89,6 +122,23 @@ url = "https://<route>/mcp"
 ```
 
 ### How the OAuth login works
+
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant MCP as sri-adt-mcp
+    participant XSUAA
+    Agent->>MCP: discover /.well-known/oauth-*
+    Agent->>MCP: POST /oauth/register
+    MCP-->>Agent: fixed public client_id
+    Agent->>MCP: GET /oauth/authorize
+    MCP->>XSUAA: redirect to login (browser)
+    XSUAA-->>Agent: authorization code
+    Agent->>MCP: POST /oauth/token (code)
+    MCP->>XSUAA: exchange + inject client secret
+    XSUAA-->>MCP: access token
+    MCP-->>Agent: access token
+```
 
 XSUAA doesn't support dynamic client registration, which MCP clients expect. So the app acts as a small authorization-server front end:
 - It serves `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`.
