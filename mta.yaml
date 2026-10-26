@@ -1,0 +1,62 @@
+_schema-version: "3.1"
+ID: sri-adt-mcp
+version: 1.0.0
+description: MCP server that gives AI agents full SAP ADT capability through a BTP destination
+
+parameters:
+  enable-parallel-deployments: true
+
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm install --no-audit --no-fund
+        - npm run build
+
+modules:
+  - name: sri-adt-mcp
+    type: nodejs
+    path: .
+    build-parameters:
+      builder: custom
+      commands: []
+      ignore: [".git/", "node_modules/", "src/", "test/", "*.key.json", ".env", "mta_archives/", ".mta/"]
+    parameters:
+      memory: 256M
+      disk-quota: 512M
+      command: node dist/index.js
+      health-check-type: http
+      health-check-http-endpoint: /health
+    properties:
+      # Name of the BTP destination that points to the ABAP system (/sap/bc/adt must be reachable).
+      SRI_ADT_DESTINATION: ABAP_ADT
+      # Optional: further destinations callers may choose, comma-separated.
+      SRI_ADT_DESTINATIONS: ""
+      SRI_ADT_READONLY: "false"
+      SRI_ADT_ALLOWED_PACKAGES: ""
+      NODE_OPTIONS: --max-old-space-size=200
+    requires:
+      - name: sri-adt-mcp-xsuaa
+      - name: sri-adt-mcp-destination
+      - name: sri-adt-mcp-connectivity
+
+resources:
+  - name: sri-adt-mcp-xsuaa
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+
+  - name: sri-adt-mcp-destination
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: destination
+      service-plan: lite
+
+  # Needed for on-premise destinations (Cloud Connector); harmless otherwise.
+  - name: sri-adt-mcp-connectivity
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: connectivity
+      service-plan: lite

@@ -1,0 +1,26 @@
+{
+  "xsappname": "sri-adt-mcp",
+  "tenant-mode": "dedicated",
+  "description": "sri-adt-mcp: MCP server for SAP ADT via BTP destination",
+  "scopes": [
+    { "name": "$XSAPPNAME.read", "description": "Use read-only ADT tools" },
+    { "name": "$XSAPPNAME.write", "description": "Use ADT tools that change, run, transport or debug" }
+  ],
+  "role-templates": [
+    { "name": "AdtViewer", "description": "Read-only ADT access", "scope-references": ["$XSAPPNAME.read"] },
+    { "name": "AdtDeveloper", "description": "Full ADT access", "scope-references": ["$XSAPPNAME.read", "$XSAPPNAME.write"] }
+  ],
+  "role-collections": [
+    { "name": "SRI_ADT_Viewer", "description": "sri-adt-mcp: read-only ADT access", "role-template-references": ["$XSAPPNAME.AdtViewer"] },
+    { "name": "SRI_ADT_Developer", "description": "sri-adt-mcp: full ADT access", "role-template-references": ["$XSAPPNAME.AdtDeveloper"] }
+  ],
+  "oauth2-configuration": {
+    "grant-types": ["authorization_code", "refresh_token"],
+    "redirect-uris": [
+      "http://localhost:*/**",
+      "http://127.0.0.1:*/**",
+      "https://vscode.dev/redirect",
+      "cursor://anysphere.cursor-mcp/**"
+    ]
+  }
+}

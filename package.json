@@ -1,0 +1,52 @@
+{
+  "name": "sri-adt-mcp",
+  "version": "1.0.0",
+  "description": "MCP server that gives AI agents (Claude Code, Cursor, Codex, VS Code, ...) the full SAP ADT capability of an ABAP system, reached through an SAP BTP destination with XSUAA OAuth login.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/srijayant/sri-adt-mcp.git"
+  },
+  "homepage": "https://github.com/srijayant/sri-adt-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/srijayant/sri-adt-mcp/issues"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "build:mta": "mbt build",
+    "deploy": "mbt build && cf deploy mta_archives/sri-adt-mcp_1.0.0.mtar",
+    "deploy:local": "mbt build && cf deploy mta_archives/sri-adt-mcp_1.0.0.mtar -e local.mtaext"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@sap-cloud-sdk/http-client": "^4.9.1",
+    "@sap/xssec": "^4.15.0",
+    "fast-xml-parser": "^4.5.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "sap",
+    "abap",
+    "adt",
+    "btp",
+    "cloud-foundry"
+  ]
+}

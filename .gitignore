@@ -1,0 +1,9 @@
+node_modules/
+dist/
+mta_archives/
+.mta/
+*.mtar
+*.key.json
+service-key*.json
+.env
+*.mtaext
