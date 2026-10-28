@@ -153,19 +153,32 @@ export class AdtClient {
     if (s.cookies.size) headers.cookie = [...s.cookies].map(([k, v]) => `${k}=${v}`).join('; ');
     Object.assign(headers, lowerKeys(req.headers ?? {}));
 
-    const r = await this.execute(
-      { destinationName: dest, jwt },
-      {
-        method,
-        url,
-        headers,
-        data: req.body !== undefined && method !== 'GET' && method !== 'HEAD' ? req.body : undefined,
-        timeout: this.cfg.timeoutMs,
-        responseType: 'arraybuffer',
-        validateStatus: () => true,
-      },
-      { fetchCsrfToken: false },
-    );
+    let r: { status: number; headers: Record<string, unknown>; data: unknown };
+    try {
+      r = await this.execute(
+        { destinationName: dest, jwt },
+        {
+          method,
+          url,
+          headers,
+          data: req.body !== undefined && method !== 'GET' && method !== 'HEAD' ? req.body : undefined,
+          timeout: this.cfg.timeoutMs,
+          responseType: 'arraybuffer',
+          validateStatus: () => true,
+        },
+        { fetchCsrfToken: false },
+      );
+    } catch (e) {
+      const msg = (e as Error)?.message ?? String(e);
+      if (/destination/i.test(msg) && /(not be found|not found|unable to find|could not.{0,40}find|does not exist|no destination|was not found)/i.test(msg)) {
+        throw new AdtError(
+          424,
+          `BTP destination "${dest}" could not be found. Create an HTTP destination named exactly "${dest}" in this app's subaccount, pointing at the ABAP system (Authentication = BasicAuthentication with an ABAP user, or PrincipalPropagation). Then retry.`,
+          msg,
+        );
+      }
+      throw new AdtError(502, `Could not reach BTP destination "${dest}": ${msg}`, msg);
+    }
 
     const flat: Record<string, string> = {};
     let setCookie: string[] = [];

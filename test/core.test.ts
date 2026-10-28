@@ -109,6 +109,14 @@ describe('AdtClient via destination', () => {
     expect(called).toBe(true);
   });
 
+  it('explains which destination to create when it is missing', async () => {
+    const execute: Executor = async () => {
+      throw new Error("Unable to find a destination with name 'adt_dest_rahul'.");
+    };
+    const c = new AdtClient(loadConfig({ SRI_ADT_DESTINATION: 'adt_dest_rahul' } as any), () => 'jwt', { execute });
+    await expect(c.get('/discovery')).rejects.toThrow(/Create an HTTP destination named exactly "adt_dest_rahul"/);
+  });
+
   it('throws readable ADT error', async () => {
     const execute: Executor = async () => ({
       status: 404,
