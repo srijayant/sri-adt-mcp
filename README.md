@@ -156,11 +156,36 @@ Set these as properties in `mta.yaml`, or with `cf set-env`.
 |---|---|
 | `SRI_ADT_DESTINATION` | **Required.** Default destination name. |
 | `SRI_ADT_DESTINATIONS` | Further destinations that callers may select with a tool's `destination` argument, comma-separated (e.g. `ABAP_DEV,ABAP_QAS`). Any other name is refused. |
+| `SRI_ADT_USER_DESTINATIONS` | Per-developer routing: map each signed-in user to their own destination. JSON (`{"a@corp.com":"adt_dest_a"}`) or `a@corp.com=adt_dest_a,b@corp.com=adt_dest_b`. See [Team access](#team-access--per-developer-identity). |
+| `SRI_ADT_USER_DESTINATION_TEMPLATE` | Derive a per-user destination by convention, e.g. `adt_dest_{user}` (`{user}` = the logon's local part, lowercased). Checked after the explicit map. |
+| `SRI_ADT_USER_DESTINATION_REQUIRED` | `true` refuses users with no mapped destination, instead of falling back to `SRI_ADT_DESTINATION`. |
 | `SRI_ADT_READONLY` | `true` hides every tool that changes, runs, transports or debugs anything, for all users. |
 | `SRI_ADT_ALLOWED_PACKAGES` | Packages that create, write and delete may touch, e.g. `Z*,$TMP`. |
 | `SRI_ADT_TIMEOUT_MS` | Timeout per backend request (default 120000). |
 | `SRI_ADT_MAX_OUTPUT` | Maximum characters returned per tool call (default 200000). |
 | `SRI_ADT_PUBLIC_URL` | External base URL, if the app sits behind a custom domain or proxy. By default it is taken from the request headers. |
+
+## Team access / per-developer identity
+
+By default, with a `BasicAuthentication` destination, **every** signed-in user acts as the one ABAP user configured in that destination. For a single person that's fine; for a team it means shared locks, one transport owner, and no per-developer attribution.
+
+Two ways to give each developer their own ABAP identity:
+
+1. **Principal Propagation** (no stored passwords) — switch the destination to `PrincipalPropagation` (on-premise via Cloud Connector) or an OAuth2 user-propagating type. The server already forwards each user's JWT, so no code or config change is needed. Best when your Cloud Connector / trust is set up for it.
+
+2. **Per-developer destinations** (no Cloud Connector work) — give each developer their own `BasicAuthentication` destination holding *their* ABAP user, and let the server route each signed-in user to theirs. One app, one URL for the whole team; the server reads the user from their XSUAA token and picks the matching destination.
+
+   ```
+   # one destination per developer in the subaccount: adt_dest_alice, adt_dest_bob, ...
+   SRI_ADT_USER_DESTINATION_TEMPLATE=adt_dest_{user}
+   # or an explicit map when the ABAP user differs from the BTP logon:
+   SRI_ADT_USER_DESTINATIONS={"alice@corp.com":"adt_dest_alice","bob@corp.com":"adt_dest_bob"}
+   SRI_ADT_USER_DESTINATION_REQUIRED=true
+   ```
+
+   The explicit map wins; the template is the fallback; if neither matches, the user falls back to `SRI_ADT_DESTINATION` (or is refused when `SRI_ADT_USER_DESTINATION_REQUIRED=true`). Mapped destinations are allowed automatically — you don't need to repeat them in `SRI_ADT_DESTINATIONS`. The trade-off vs. principal propagation is that each developer's ABAP password is stored in their destination and must be maintained when it rotates.
+
+Either way, every teammate still needs the `SRI_ADT_Developer` (or `SRI_ADT_Viewer`) role collection to connect.
 
 ## Tools
 

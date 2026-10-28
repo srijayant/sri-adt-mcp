@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import * as xssec from '@sap/xssec';
-import type { Config } from './config.js';
+import { resolveUserDestination, type Config } from './config.js';
 import { AdtClient } from './http/adtClient.js';
 import { buildServer, VERSION } from './server.js';
 import { handleOAuth, resourceMetadataUrl, type OAuthDeps } from './oauth.js';
@@ -102,12 +102,20 @@ export async function startHttp(cfg: Config): Promise<void> {
       return send(res, 401, { error: 'invalid token', detail: (e as Error).message }, { 'www-authenticate': `${challenge}, error="invalid_token"` });
     }
 
+    const mappedDestination = resolveUserDestination(cfg, user);
+    if (!mappedDestination && cfg.userDestinationRequired) {
+      return send(res, 403, { error: `no ABAP destination is mapped for user ${user} (SRI_ADT_USER_DESTINATIONS / SRI_ADT_USER_DESTINATION_TEMPLATE)` });
+    }
+    const destination = mappedDestination ?? cfg.destination;
+
     const readOnly = cfg.readOnly || !canWrite;
-    const key = `${user}|${readOnly ? 'ro' : 'rw'}`;
+    const key = `${user}|${destination}|${readOnly ? 'ro' : 'rw'}`;
     let s = sessions.get(key);
     if (!s) {
+      // The server resolved this destination from the signed-in identity, so it is allowed for this user.
+      const userCfg: Config = { ...cfg, readOnly, destination, allowedDestinations: [...new Set([destination, ...cfg.allowedDestinations])] };
       const created: UserSession = { jwt, lastUsed: 0, client: undefined as unknown as AdtClient };
-      created.client = new AdtClient({ ...cfg, readOnly }, () => created.jwt);
+      created.client = new AdtClient(userCfg, () => created.jwt);
       sessions.set(key, created);
       s = created;
     }

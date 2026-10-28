@@ -3,7 +3,7 @@ import { objectUri, sourceUri } from '../src/adt/uri.js';
 import { createBody } from '../src/adt/templates.js';
 import { adtPath, AdtClient, type Executor } from '../src/http/adtClient.js';
 import { requireUser, IdentityError } from '../src/auth/identity.js';
-import { loadConfig, packageAllowed } from '../src/config.js';
+import { loadConfig, packageAllowed, resolveUserDestination } from '../src/config.js';
 
 describe('uri', () => {
   it('maps types', () => {
@@ -45,6 +45,25 @@ describe('config', () => {
     expect(packageAllowed(cfg, 'ZSALES')).toBe(true);
     expect(packageAllowed(cfg, '$tmp')).toBe(true);
     expect(packageAllowed(cfg, 'SAPX')).toBe(false);
+  });
+
+  it('per-user destinations: explicit map wins, then template, and feed the allowlist', () => {
+    const cfg = loadConfig({
+      SRI_ADT_DESTINATION: 'S4',
+      SRI_ADT_USER_DESTINATIONS: '{"sri.jayant@bsci.com":"adt_dest_sri"}',
+      SRI_ADT_USER_DESTINATION_TEMPLATE: 'adt_dest_{user}',
+    } as any);
+    expect(resolveUserDestination(cfg, 'sri.jayant@bsci.com')).toBe('adt_dest_sri'); // explicit map
+    expect(resolveUserDestination(cfg, 'SRI.JAYANT@bsci.com')).toBe('adt_dest_sri'); // case-insensitive
+    expect(resolveUserDestination(cfg, 'rahul@bsci.com')).toBe('adt_dest_rahul'); // template, local part
+    expect(resolveUserDestination(cfg, undefined)).toBeUndefined();
+    expect(cfg.allowedDestinations).toContain('adt_dest_sri'); // mapped dests are auto-allowed
+  });
+
+  it('per-user destinations: k=v syntax and no-mapping fallback', () => {
+    const cfg = loadConfig({ SRI_ADT_DESTINATION: 'S4', SRI_ADT_USER_DESTINATIONS: 'a@x=d_a, b@x=d_b' } as any);
+    expect(resolveUserDestination(cfg, 'a@x')).toBe('d_a');
+    expect(resolveUserDestination(cfg, 'nobody@x')).toBeUndefined(); // no template → caller falls back to default
   });
 });
 
