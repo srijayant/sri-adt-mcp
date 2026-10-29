@@ -76,38 +76,43 @@ describe('identity', () => {
   });
 });
 
-describe('DestinationDirectory (property-based routing)', () => {
-  it('matches a user by property, case-insensitively, and caches', async () => {
+describe('DestinationDirectory (two-level routing)', () => {
+  const team = () => [
+    { Name: 'adt_mcp_dest_s4_sj', mcpuser: 'sri.jayant@bsci.com' },
+    { Name: 'adt_mcp_dest_ecc_sj', mcpuser: 'sri.jayant@bsci.com' },
+    { Name: 'adt_mcp_dest_s4_rg', mcpuser: 'rahul@bsci.com' },
+    { Name: 'some_other_dest', mcpuser: 'sri.jayant@bsci.com' }, // wrong prefix → ignored
+  ];
+
+  it('groups a user\'s destinations by system parsed from the name, case-insensitively, and caches', async () => {
     let calls = 0;
-    const lister = async () => {
-      calls++;
-      return [
-        { Name: 'ADT_DEV_01', 'mcpuser': 'sri.jayant@bsci.com' },
-        { Name: 'ADT_DEV_02', 'mcpuser': 'rahul@bsci.com' },
-      ];
-    };
-    const d = new DestinationDirectory('mcpuser', 60_000, lister);
-    expect(await d.destinationForUser('SRI.JAYANT@bsci.com')).toBe('ADT_DEV_01');
-    expect(await d.destinationForUser('rahul@bsci.com')).toBe('ADT_DEV_02');
-    expect(calls).toBe(1); // second lookup served from cache
+    const d = new DestinationDirectory('mcpuser', 60_000, async () => (calls++, team()), 'adt_mcp_dest');
+    const sri = await d.destinationsForUser('SRI.JAYANT@bsci.com');
+    expect(sri.get('s4')).toBe('adt_mcp_dest_s4_sj');
+    expect(sri.get('ecc')).toBe('adt_mcp_dest_ecc_sj');
+    expect(sri.has('some_other_dest')).toBe(false);
+    const rahul = await d.destinationsForUser('rahul@bsci.com');
+    expect([...rahul.keys()]).toEqual(['s4']);
+    expect(calls).toBe(1); // served from cache
   });
 
-  it('honours a name prefix, ignoring tagged destinations outside it', async () => {
-    const lister = async () => [
-      { Name: 'adt_mcp_dest_sri', 'mcpuser': 'sri@x' },
-      { Name: 'some_other_dest', 'mcpuser': 'sri@x' }, // same tag, wrong prefix
-    ];
-    const d = new DestinationDirectory('mcpuser', 60_000, lister, 'adt_mcp_dest');
-    expect(await d.destinationForUser('sri@x')).toBe('adt_mcp_dest_sri');
+  it('lets an explicit mcpsystem tag override the name', async () => {
+    const d = new DestinationDirectory(
+      'mcpuser',
+      60_000,
+      async () => [{ Name: 'adt_mcp_dest_weird_sj', mcpuser: 'sri@x', mcpsystem: 'ECC' }],
+      'adt_mcp_dest',
+    );
+    expect((await d.destinationsForUser('sri@x')).get('ecc')).toBe('adt_mcp_dest_weird_sj');
   });
 
   it('refreshes on a miss so a newly added destination is picked up', async () => {
-    let list = [{ Name: 'ADT_A', 'mcpuser': 'a@x' }];
-    const d = new DestinationDirectory('mcpuser', 60_000, async () => list);
-    expect(await d.destinationForUser('a@x')).toBe('ADT_A');
-    expect(await d.destinationForUser('b@x')).toBeUndefined();
-    list = [...list, { Name: 'ADT_B', 'mcpuser': 'b@x' }];
-    expect(await d.destinationForUser('b@x')).toBe('ADT_B');
+    let list = [{ Name: 'adt_mcp_dest_s4_a', mcpuser: 'a@x' }];
+    const d = new DestinationDirectory('mcpuser', 60_000, async () => list, 'adt_mcp_dest');
+    expect((await d.destinationsForUser('a@x')).get('s4')).toBe('adt_mcp_dest_s4_a');
+    expect((await d.destinationsForUser('b@x')).size).toBe(0);
+    list = [...list, { Name: 'adt_mcp_dest_s4_b', mcpuser: 'b@x' }];
+    expect((await d.destinationsForUser('b@x')).get('s4')).toBe('adt_mcp_dest_s4_b');
   });
 });
 
@@ -135,6 +140,25 @@ describe('AdtClient via destination', () => {
     expect(last.req.url).toBe('/sap/bc/adt/activation?method=activate');
     expect(last.req.headers['x-csrf-token']).toBe('tok2');
     expect(last.req.headers.cookie).toContain('SAP_SESSIONID=abc');
+  });
+
+  it('translates a system alias to the user\'s destination', async () => {
+    const userCfg = {
+      ...cfg,
+      destination: 'adt_mcp_dest_s4_sj',
+      allowedDestinations: ['adt_mcp_dest_s4_sj', 'adt_mcp_dest_ecc_sj'],
+      systemDestinations: new Map([
+        ['s4', 'adt_mcp_dest_s4_sj'],
+        ['ecc', 'adt_mcp_dest_ecc_sj'],
+      ]),
+    };
+    let seen = '';
+    const execute: Executor = async (dest) => ((seen = dest.destinationName), { status: 200, headers: {}, data: Buffer.from('<ok/>') });
+    const c = new AdtClient(userCfg as any, () => 'jwt', { execute });
+    await c.get('/discovery', { destination: 'ecc' }); // alias → real destination
+    expect(seen).toBe('adt_mcp_dest_ecc_sj');
+    await c.get('/discovery'); // no arg → session default (s4)
+    expect(seen).toBe('adt_mcp_dest_s4_sj');
   });
 
   it('enforces the destination allowlist before calling out', async () => {

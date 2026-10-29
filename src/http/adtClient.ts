@@ -118,7 +118,9 @@ export class AdtClient {
   }
 
   private destinationFor(req: { destination?: string }): string {
-    const dest = req.destination ?? this.cfg.destination;
+    const sel = req.destination;
+    // In property-based routing the caller passes a system alias (e.g. "ecc"); translate it to this user's destination.
+    const dest = sel ? (this.cfg.systemDestinations?.get(sel.toLowerCase()) ?? sel) : this.cfg.destination;
     if (!this.cfg.allowedDestinations.includes(dest)) {
       throw new AdtError(400, `Destination "${dest}" is not allowed (SRI_ADT_DESTINATIONS: ${this.cfg.allowedDestinations.join(', ')})`, 'destination not allowed');
     }

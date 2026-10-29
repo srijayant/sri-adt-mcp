@@ -13,6 +13,10 @@ export interface Config {
   userProperty?: string;
   /** Only destinations whose name starts with this prefix are considered for property-based matching (e.g. `adt_mcp_dest`). */
   userDestinationPrefix?: string;
+  /** System alias used when a caller does not specify one (e.g. `s4`). */
+  defaultSystem?: string;
+  /** Runtime, per-user: system alias → destination name (populated per request for property-based routing). */
+  systemDestinations?: Map<string, string>;
   readOnly: boolean;
   allowedPackages: string[];
   timeoutMs: number;
@@ -43,6 +47,7 @@ export function loadConfig(env = process.env): Config {
     userDestinationRequired: bool(env.SRI_ADT_USER_DESTINATION_REQUIRED),
     userProperty: env.SRI_ADT_USER_PROPERTY?.trim() || undefined,
     userDestinationPrefix: env.SRI_ADT_USER_DESTINATION_PREFIX?.trim() || undefined,
+    defaultSystem: env.SRI_ADT_DEFAULT_SYSTEM?.trim().toLowerCase() || undefined,
     readOnly: bool(env.SRI_ADT_READONLY),
     allowedPackages: list(env.SRI_ADT_ALLOWED_PACKAGES, true),
     timeoutMs: Number(env.SRI_ADT_TIMEOUT_MS ?? 120_000),

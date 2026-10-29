@@ -160,7 +160,8 @@ Set these as properties in `mta.yaml`, or with `cf set-env`.
 | `SRI_ADT_USER_DESTINATION_TEMPLATE` | Derive a per-user destination by convention, e.g. `adt_dest_{user}` (`{user}` = the logon's local part, lowercased). Checked after the explicit map. |
 | `SRI_ADT_USER_DESTINATION_REQUIRED` | `true` refuses users with no mapped destination, instead of falling back to `SRI_ADT_DESTINATION`. |
 | `SRI_ADT_USER_PROPERTY` | Enables property-based routing: the destination additional-property whose value is matched (case-insensitive) against the signed-in user, e.g. `mcpuser`. No match → the user is refused with guidance. See [Team access](#team-access--per-developer-identity). |
-| `SRI_ADT_USER_DESTINATION_PREFIX` | With property-based routing, only consider destinations whose name starts with this prefix (e.g. `adt_mcp_dest`). Keeps matching scoped to the MCP's own destinations. |
+| `SRI_ADT_USER_DESTINATION_PREFIX` | With property-based routing, only consider destinations whose name starts with this prefix (e.g. `adt_mcp_dest`). Keeps matching scoped to the MCP's own destinations, and is the prefix stripped to parse the system token from the name. |
+| `SRI_ADT_DEFAULT_SYSTEM` | System alias used when a caller passes no `destination` argument (e.g. `s4`). Falls back to `s4`, then the user's only destination. |
 | `SRI_ADT_READONLY` | `true` hides every tool that changes, runs, transports or debugs anything, for all users. |
 | `SRI_ADT_ALLOWED_PACKAGES` | Packages that create, write and delete may touch, e.g. `Z*,$TMP`. |
 | `SRI_ADT_TIMEOUT_MS` | Timeout per backend request (default 120000). |
@@ -201,6 +202,21 @@ Two ways to give each developer their own ABAP identity:
    SRI_ADT_USER_PROPERTY=mcpuser
    SRI_ADT_USER_DESTINATION_PREFIX=adt_mcp_dest
    ```
+
+   **Multiple systems per developer (two-level routing).** A developer often needs more than one backend (e.g. S/4 *and* ECC). Give them one destination per system, named `<prefix>_<system>_<who>`, each tagged `mcpuser`:
+
+   ```
+   adt_mcp_dest_s4_sj     mcpuser=sri.jayant@corp.com    → S/4
+   adt_mcp_dest_ecc_sj    mcpuser=sri.jayant@corp.com    → ECC
+   adt_mcp_dest_s4_rg     mcpuser=rahul@corp.com         → S/4
+   ```
+   ```
+   SRI_ADT_USER_PROPERTY=mcpuser
+   SRI_ADT_USER_DESTINATION_PREFIX=adt_mcp_dest
+   SRI_ADT_DEFAULT_SYSTEM=s4
+   ```
+
+   The server resolves in two levels: **(1) who** — all destinations tagged `mcpuser = <you>`; **(2) which system** — the token after the prefix in the name (`s4`, `ecc`, …), or an explicit `mcpsystem` tag if you set one (the tag wins). A caller selects the system by passing it as the tool's `destination` argument (e.g. `destination: "ecc"`); with no argument the `SRI_ADT_DEFAULT_SYSTEM` (else `s4`, else the only one) is used. The suffix (`_sj`, `_rg`) is for humans — the server reads the tag, not the suffix.
 
 Either way, every teammate still needs the `SRI_ADT_Developer` (or `SRI_ADT_Viewer`) role collection to connect.
 

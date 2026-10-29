@@ -108,16 +108,22 @@ export async function startHttp(cfg: Config): Promise<void> {
 
     // Resolve this user's destination: explicit map / template first, then property-based discovery.
     let mappedDestination = resolveUserDestination(cfg, user);
+    let systemDestinations: Map<string, string> | undefined;
     if (!mappedDestination && directory) {
       try {
-        mappedDestination = await directory.destinationForUser(user);
+        const map = await directory.destinationsForUser(user);
+        if (map.size) {
+          systemDestinations = map;
+          // Session default: the configured default system, else `s4`, else any — callers switch per call via the `destination` arg.
+          mappedDestination = (cfg.defaultSystem && map.get(cfg.defaultSystem)) || map.get('s4') || [...map.values()][0];
+        }
       } catch (e) {
         log('destination lookup failed:', (e as Error).message);
       }
     }
     if (!mappedDestination && (cfg.userDestinationRequired || cfg.userProperty)) {
       const how = cfg.userProperty
-        ? `Create a BasicAuthentication destination in this subaccount with additional property "${cfg.userProperty}" = "${user}".`
+        ? `Create a BasicAuthentication destination named ${cfg.userDestinationPrefix ?? 'adt_mcp_dest'}_<system>_<you> in this subaccount with additional property "${cfg.userProperty}" = "${user}".`
         : `Map ${user} via SRI_ADT_USER_DESTINATIONS or SRI_ADT_USER_DESTINATION_TEMPLATE.`;
       return send(res, 403, { error: `No ABAP destination is configured for ${user}. ${how}` });
     }
@@ -128,7 +134,13 @@ export async function startHttp(cfg: Config): Promise<void> {
     let s = sessions.get(key);
     if (!s) {
       // The server resolved this destination from the signed-in identity, so it is allowed for this user.
-      const userCfg: Config = { ...cfg, readOnly, destination, allowedDestinations: [...new Set([destination, ...cfg.allowedDestinations])] };
+      const userCfg: Config = {
+        ...cfg,
+        readOnly,
+        destination,
+        systemDestinations,
+        allowedDestinations: [...new Set([destination, ...(systemDestinations ? systemDestinations.values() : []), ...cfg.allowedDestinations])],
+      };
       const created: UserSession = { jwt, lastUsed: 0, client: undefined as unknown as AdtClient };
       created.client = new AdtClient(userCfg, () => created.jwt);
       sessions.set(key, created);
