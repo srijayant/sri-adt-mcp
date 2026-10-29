@@ -11,6 +11,8 @@ export interface Config {
   userDestinationRequired: boolean;
   /** Destination additional-property whose value is matched against the signed-in user (e.g. `sri-adt-mcp.user`). Enables property-based discovery when set. */
   userProperty?: string;
+  /** Only destinations whose name starts with this prefix are considered for property-based matching (e.g. `adt_mcp_dest`). */
+  userDestinationPrefix?: string;
   readOnly: boolean;
   allowedPackages: string[];
   timeoutMs: number;
@@ -40,6 +42,7 @@ export function loadConfig(env = process.env): Config {
     userDestinationTemplate: env.SRI_ADT_USER_DESTINATION_TEMPLATE?.trim() || undefined,
     userDestinationRequired: bool(env.SRI_ADT_USER_DESTINATION_REQUIRED),
     userProperty: env.SRI_ADT_USER_PROPERTY?.trim() || undefined,
+    userDestinationPrefix: env.SRI_ADT_USER_DESTINATION_PREFIX?.trim() || undefined,
     readOnly: bool(env.SRI_ADT_READONLY),
     allowedPackages: list(env.SRI_ADT_ALLOWED_PACKAGES, true),
     timeoutMs: Number(env.SRI_ADT_TIMEOUT_MS ?? 120_000),

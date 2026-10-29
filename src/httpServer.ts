@@ -60,7 +60,7 @@ export async function startHttp(cfg: Config): Promise<void> {
   };
 
   // Optional: resolve each user's destination by matching a custom additional property on the destination.
-  const directory = cfg.userProperty ? new DestinationDirectory(cfg.userProperty) : undefined;
+  const directory = cfg.userProperty ? new DestinationDirectory(cfg.userProperty, undefined, undefined, cfg.userDestinationPrefix) : undefined;
 
   // One ADT client per user, so CSRF token, cookies and locks persist across tool calls.
   const sessions = new Map<string, UserSession>();

@@ -50,6 +50,8 @@ export class DestinationDirectory {
     private property: string,
     private ttlMs = 5 * 60 * 1000,
     private lister: DestinationLister = defaultLister,
+    /** If set, only destinations whose name starts with this prefix are considered. */
+    private namePrefix?: string,
   ) {}
 
   /** Destination name whose `property` equals `user` (case-insensitive), or undefined. Refreshes once on a miss. */
@@ -69,6 +71,7 @@ export class DestinationDirectory {
       const list = await this.lister();
       const byUser = new Map<string, string>();
       for (const d of list) {
+        if (this.namePrefix && !d.Name?.startsWith(this.namePrefix)) continue;
         const v = d[this.property];
         if (v && d.Name) byUser.set(String(v).trim().toLowerCase(), d.Name);
       }

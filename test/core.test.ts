@@ -92,6 +92,15 @@ describe('DestinationDirectory (property-based routing)', () => {
     expect(calls).toBe(1); // second lookup served from cache
   });
 
+  it('honours a name prefix, ignoring tagged destinations outside it', async () => {
+    const lister = async () => [
+      { Name: 'adt_mcp_dest_sri', 'sri-adt-mcp.user': 'sri@x' },
+      { Name: 'some_other_dest', 'sri-adt-mcp.user': 'sri@x' }, // same tag, wrong prefix
+    ];
+    const d = new DestinationDirectory('sri-adt-mcp.user', 60_000, lister, 'adt_mcp_dest');
+    expect(await d.destinationForUser('sri@x')).toBe('adt_mcp_dest_sri');
+  });
+
   it('refreshes on a miss so a newly added destination is picked up', async () => {
     let list = [{ Name: 'ADT_A', 'sri-adt-mcp.user': 'a@x' }];
     const d = new DestinationDirectory('sri-adt-mcp.user', 60_000, async () => list);
