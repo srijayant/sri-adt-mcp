@@ -159,7 +159,7 @@ Set these as properties in `mta.yaml`, or with `cf set-env`.
 | `SRI_ADT_USER_DESTINATIONS` | Per-developer routing: map each signed-in user to their own destination. JSON (`{"a@corp.com":"adt_dest_a"}`) or `a@corp.com=adt_dest_a,b@corp.com=adt_dest_b`. See [Team access](#team-access--per-developer-identity). |
 | `SRI_ADT_USER_DESTINATION_TEMPLATE` | Derive a per-user destination by convention, e.g. `adt_dest_{user}` (`{user}` = the logon's local part, lowercased). Checked after the explicit map. |
 | `SRI_ADT_USER_DESTINATION_REQUIRED` | `true` refuses users with no mapped destination, instead of falling back to `SRI_ADT_DESTINATION`. |
-| `SRI_ADT_USER_PROPERTY` | Enables property-based routing: the destination additional-property whose value is matched (case-insensitive) against the signed-in user, e.g. `sri-adt-mcp.user`. No match → the user is refused with guidance. See [Team access](#team-access--per-developer-identity). |
+| `SRI_ADT_USER_PROPERTY` | Enables property-based routing: the destination additional-property whose value is matched (case-insensitive) against the signed-in user, e.g. `mcpuser`. No match → the user is refused with guidance. See [Team access](#team-access--per-developer-identity). |
 | `SRI_ADT_USER_DESTINATION_PREFIX` | With property-based routing, only consider destinations whose name starts with this prefix (e.g. `adt_mcp_dest`). Keeps matching scoped to the MCP's own destinations. |
 | `SRI_ADT_READONLY` | `true` hides every tool that changes, runs, transports or debugs anything, for all users. |
 | `SRI_ADT_ALLOWED_PACKAGES` | Packages that create, write and delete may touch, e.g. `Z*,$TMP`. |
@@ -190,15 +190,15 @@ Two ways to give each developer their own ABAP identity:
    **Property-based routing (no naming convention, no redeploy to onboard).** Instead of encoding the user in the destination *name*, tag each destination with a custom additional property and let the server discover it:
 
    ```
-   SRI_ADT_USER_PROPERTY=sri-adt-mcp.user
+   SRI_ADT_USER_PROPERTY=mcpuser
    ```
 
-   Then create a destination named *anything*, with additional property `sri-adt-mcp.user = alice@corp.com` and Alice's ABAP credentials. On each request the server lists the subaccount's destinations (cached ~5 min, refreshed on a miss), finds the one whose property equals the signed-in user, and routes to it. Adding a developer is just creating a tagged destination — no app config change, no redeploy. A user with no matching destination is refused with a message telling them exactly which property to set. This needs the destination-service binding (already bound by the MTA); the property stores an identity (an email), not a secret.
+   Then create a destination named *anything*, with additional property `mcpuser = alice@corp.com` and Alice's ABAP credentials. On each request the server lists the subaccount's destinations (cached ~5 min, refreshed on a miss), finds the one whose property equals the signed-in user, and routes to it. Adding a developer is just creating a tagged destination — no app config change, no redeploy. A user with no matching destination is refused with a message telling them exactly which property to set. This needs the destination-service binding (already bound by the MTA); the property stores an identity (an email), not a secret.
 
    A simple team convention is to name every per-developer destination under a shared prefix (e.g. `adt_mcp_dest_alice`, `adt_mcp_dest_bob`) and scope matching to it, so the server never considers unrelated destinations:
 
    ```
-   SRI_ADT_USER_PROPERTY=sri-adt-mcp.user
+   SRI_ADT_USER_PROPERTY=mcpuser
    SRI_ADT_USER_DESTINATION_PREFIX=adt_mcp_dest
    ```
 

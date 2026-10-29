@@ -82,11 +82,11 @@ describe('DestinationDirectory (property-based routing)', () => {
     const lister = async () => {
       calls++;
       return [
-        { Name: 'ADT_DEV_01', 'sri-adt-mcp.user': 'sri.jayant@bsci.com' },
-        { Name: 'ADT_DEV_02', 'sri-adt-mcp.user': 'rahul@bsci.com' },
+        { Name: 'ADT_DEV_01', 'mcpuser': 'sri.jayant@bsci.com' },
+        { Name: 'ADT_DEV_02', 'mcpuser': 'rahul@bsci.com' },
       ];
     };
-    const d = new DestinationDirectory('sri-adt-mcp.user', 60_000, lister);
+    const d = new DestinationDirectory('mcpuser', 60_000, lister);
     expect(await d.destinationForUser('SRI.JAYANT@bsci.com')).toBe('ADT_DEV_01');
     expect(await d.destinationForUser('rahul@bsci.com')).toBe('ADT_DEV_02');
     expect(calls).toBe(1); // second lookup served from cache
@@ -94,19 +94,19 @@ describe('DestinationDirectory (property-based routing)', () => {
 
   it('honours a name prefix, ignoring tagged destinations outside it', async () => {
     const lister = async () => [
-      { Name: 'adt_mcp_dest_sri', 'sri-adt-mcp.user': 'sri@x' },
-      { Name: 'some_other_dest', 'sri-adt-mcp.user': 'sri@x' }, // same tag, wrong prefix
+      { Name: 'adt_mcp_dest_sri', 'mcpuser': 'sri@x' },
+      { Name: 'some_other_dest', 'mcpuser': 'sri@x' }, // same tag, wrong prefix
     ];
-    const d = new DestinationDirectory('sri-adt-mcp.user', 60_000, lister, 'adt_mcp_dest');
+    const d = new DestinationDirectory('mcpuser', 60_000, lister, 'adt_mcp_dest');
     expect(await d.destinationForUser('sri@x')).toBe('adt_mcp_dest_sri');
   });
 
   it('refreshes on a miss so a newly added destination is picked up', async () => {
-    let list = [{ Name: 'ADT_A', 'sri-adt-mcp.user': 'a@x' }];
-    const d = new DestinationDirectory('sri-adt-mcp.user', 60_000, async () => list);
+    let list = [{ Name: 'ADT_A', 'mcpuser': 'a@x' }];
+    const d = new DestinationDirectory('mcpuser', 60_000, async () => list);
     expect(await d.destinationForUser('a@x')).toBe('ADT_A');
     expect(await d.destinationForUser('b@x')).toBeUndefined();
-    list = [...list, { Name: 'ADT_B', 'sri-adt-mcp.user': 'b@x' }];
+    list = [...list, { Name: 'ADT_B', 'mcpuser': 'b@x' }];
     expect(await d.destinationForUser('b@x')).toBe('ADT_B');
   });
 });
