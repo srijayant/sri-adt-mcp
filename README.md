@@ -159,6 +159,7 @@ Set these as properties in `mta.yaml`, or with `cf set-env`.
 | `SRI_ADT_USER_DESTINATIONS` | Per-developer routing: map each signed-in user to their own destination. JSON (`{"a@corp.com":"adt_dest_a"}`) or `a@corp.com=adt_dest_a,b@corp.com=adt_dest_b`. See [Team access](#team-access--per-developer-identity). |
 | `SRI_ADT_USER_DESTINATION_TEMPLATE` | Derive a per-user destination by convention, e.g. `adt_dest_{user}` (`{user}` = the logon's local part, lowercased). Checked after the explicit map. |
 | `SRI_ADT_USER_DESTINATION_REQUIRED` | `true` refuses users with no mapped destination, instead of falling back to `SRI_ADT_DESTINATION`. |
+| `SRI_ADT_USER_PROPERTY` | Enables property-based routing: the destination additional-property whose value is matched (case-insensitive) against the signed-in user, e.g. `sri-adt-mcp.user`. No match → the user is refused with guidance. See [Team access](#team-access--per-developer-identity). |
 | `SRI_ADT_READONLY` | `true` hides every tool that changes, runs, transports or debugs anything, for all users. |
 | `SRI_ADT_ALLOWED_PACKAGES` | Packages that create, write and delete may touch, e.g. `Z*,$TMP`. |
 | `SRI_ADT_TIMEOUT_MS` | Timeout per backend request (default 120000). |
@@ -184,6 +185,14 @@ Two ways to give each developer their own ABAP identity:
    ```
 
    The explicit map wins; the template is the fallback; if neither matches, the user falls back to `SRI_ADT_DESTINATION` (or is refused when `SRI_ADT_USER_DESTINATION_REQUIRED=true`). Mapped destinations are allowed automatically — you don't need to repeat them in `SRI_ADT_DESTINATIONS`. The trade-off vs. principal propagation is that each developer's ABAP password is stored in their destination and must be maintained when it rotates.
+
+   **Property-based routing (no naming convention, no redeploy to onboard).** Instead of encoding the user in the destination *name*, tag each destination with a custom additional property and let the server discover it:
+
+   ```
+   SRI_ADT_USER_PROPERTY=sri-adt-mcp.user
+   ```
+
+   Then create a destination named *anything*, with additional property `sri-adt-mcp.user = alice@corp.com` and Alice's ABAP credentials. On each request the server lists the subaccount's destinations (cached ~5 min, refreshed on a miss), finds the one whose property equals the signed-in user, and routes to it. Adding a developer is just creating a tagged destination — no app config change, no redeploy. A user with no matching destination is refused with a message telling them exactly which property to set. This needs the destination-service binding (already bound by the MTA); the property stores an identity (an email), not a secret.
 
 Either way, every teammate still needs the `SRI_ADT_Developer` (or `SRI_ADT_Viewer`) role collection to connect.
 

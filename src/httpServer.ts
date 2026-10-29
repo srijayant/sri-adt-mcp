@@ -3,6 +3,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import * as xssec from '@sap/xssec';
 import { resolveUserDestination, type Config } from './config.js';
 import { AdtClient } from './http/adtClient.js';
+import { DestinationDirectory } from './http/destinationDirectory.js';
 import { buildServer, VERSION } from './server.js';
 import { handleOAuth, resourceMetadataUrl, type OAuthDeps } from './oauth.js';
 import { IdentityError, requireUser } from './auth/identity.js';
@@ -58,6 +59,9 @@ export async function startHttp(cfg: Config): Promise<void> {
     publicUrl: cfg.publicUrl,
   };
 
+  // Optional: resolve each user's destination by matching a custom additional property on the destination.
+  const directory = cfg.userProperty ? new DestinationDirectory(cfg.userProperty) : undefined;
+
   // One ADT client per user, so CSRF token, cookies and locks persist across tool calls.
   const sessions = new Map<string, UserSession>();
   setInterval(() => {
@@ -102,9 +106,20 @@ export async function startHttp(cfg: Config): Promise<void> {
       return send(res, 401, { error: 'invalid token', detail: (e as Error).message }, { 'www-authenticate': `${challenge}, error="invalid_token"` });
     }
 
-    const mappedDestination = resolveUserDestination(cfg, user);
-    if (!mappedDestination && cfg.userDestinationRequired) {
-      return send(res, 403, { error: `no ABAP destination is mapped for user ${user} (SRI_ADT_USER_DESTINATIONS / SRI_ADT_USER_DESTINATION_TEMPLATE)` });
+    // Resolve this user's destination: explicit map / template first, then property-based discovery.
+    let mappedDestination = resolveUserDestination(cfg, user);
+    if (!mappedDestination && directory) {
+      try {
+        mappedDestination = await directory.destinationForUser(user);
+      } catch (e) {
+        log('destination lookup failed:', (e as Error).message);
+      }
+    }
+    if (!mappedDestination && (cfg.userDestinationRequired || cfg.userProperty)) {
+      const how = cfg.userProperty
+        ? `Create a BasicAuthentication destination in this subaccount with additional property "${cfg.userProperty}" = "${user}".`
+        : `Map ${user} via SRI_ADT_USER_DESTINATIONS or SRI_ADT_USER_DESTINATION_TEMPLATE.`;
+      return send(res, 403, { error: `No ABAP destination is configured for ${user}. ${how}` });
     }
     const destination = mappedDestination ?? cfg.destination;
 

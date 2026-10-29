@@ -3,6 +3,7 @@ import { objectUri, sourceUri } from '../src/adt/uri.js';
 import { createBody } from '../src/adt/templates.js';
 import { adtPath, AdtClient, type Executor } from '../src/http/adtClient.js';
 import { requireUser, IdentityError } from '../src/auth/identity.js';
+import { DestinationDirectory } from '../src/http/destinationDirectory.js';
 import { loadConfig, packageAllowed, resolveUserDestination } from '../src/config.js';
 
 describe('uri', () => {
@@ -72,6 +73,32 @@ describe('identity', () => {
     expect(() => requireUser({ getGrantType: () => 'client_credentials' })).toThrow(IdentityError);
     expect(() => requireUser({ getGrantType: () => 'authorization_code', getLogonName: () => '' })).toThrow(IdentityError);
     expect(requireUser({ getGrantType: () => 'authorization_code', getLogonName: () => 'dev@example.com' }).user).toBe('dev@example.com');
+  });
+});
+
+describe('DestinationDirectory (property-based routing)', () => {
+  it('matches a user by property, case-insensitively, and caches', async () => {
+    let calls = 0;
+    const lister = async () => {
+      calls++;
+      return [
+        { Name: 'ADT_DEV_01', 'sri-adt-mcp.user': 'sri.jayant@bsci.com' },
+        { Name: 'ADT_DEV_02', 'sri-adt-mcp.user': 'rahul@bsci.com' },
+      ];
+    };
+    const d = new DestinationDirectory('sri-adt-mcp.user', 60_000, lister);
+    expect(await d.destinationForUser('SRI.JAYANT@bsci.com')).toBe('ADT_DEV_01');
+    expect(await d.destinationForUser('rahul@bsci.com')).toBe('ADT_DEV_02');
+    expect(calls).toBe(1); // second lookup served from cache
+  });
+
+  it('refreshes on a miss so a newly added destination is picked up', async () => {
+    let list = [{ Name: 'ADT_A', 'sri-adt-mcp.user': 'a@x' }];
+    const d = new DestinationDirectory('sri-adt-mcp.user', 60_000, async () => list);
+    expect(await d.destinationForUser('a@x')).toBe('ADT_A');
+    expect(await d.destinationForUser('b@x')).toBeUndefined();
+    list = [...list, { Name: 'ADT_B', 'sri-adt-mcp.user': 'b@x' }];
+    expect(await d.destinationForUser('b@x')).toBe('ADT_B');
   });
 });
 
