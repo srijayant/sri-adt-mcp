@@ -15,7 +15,7 @@
     { "name": "SRI_ADT_Developer", "description": "sri-adt-mcp: full ADT access", "role-template-references": ["$XSAPPNAME.AdtDeveloper"] }
   ],
   "oauth2-configuration": {
-    "grant-types": ["authorization_code", "refresh_token"],
+    "grant-types": ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer"],
     "redirect-uris": [
       "http://localhost:*/**",
       "http://127.0.0.1:*/**",

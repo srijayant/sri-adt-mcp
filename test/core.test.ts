@@ -73,6 +73,10 @@ describe('identity', () => {
     expect(() => requireUser({ getGrantType: () => 'client_credentials' })).toThrow(IdentityError);
     expect(() => requireUser({ getGrantType: () => 'authorization_code', getLogonName: () => '' })).toThrow(IdentityError);
     expect(requireUser({ getGrantType: () => 'authorization_code', getLogonName: () => 'dev@example.com' }).user).toBe('dev@example.com');
+    // A user token exchanged by another app (jwt-bearer) keeps the user identity and is accepted.
+    expect(
+      requireUser({ getGrantType: () => 'urn:ietf:params:oauth:grant-type:jwt-bearer', getLogonName: () => 'dev@example.com' }).user,
+    ).toBe('dev@example.com');
   });
 });
 

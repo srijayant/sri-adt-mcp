@@ -148,6 +148,24 @@ XSUAA doesn't support dynamic client registration, which MCP clients expect. So 
 
 The agents' local callback URLs are allowed through `redirect-uris` in `xs-security.json`. If your client uses a different callback, add it there and run `cf update-service sri-adt-mcp-xsuaa -c xs-security.json`.
 
+### Calling from your own app (custom agents)
+
+A custom agent running on BTP (e.g. a CAP app with a logged-in user) can call the server **on behalf of its user** by exchanging the user's token — the user's identity, role collections and per-user routing all carry over. Technical `client_credentials` tokens are still refused.
+
+1. Create a service key on `sri-adt-mcp-xsuaa` (`cf create-service-key sri-adt-mcp-xsuaa agent-key`) to get its `clientid`, `clientsecret` and `url`.
+2. In the calling app's subaccount, create a destination:
+
+   | Property | Value |
+   |---|---|
+   | URL | `https://<route>/mcp` |
+   | Authentication | `OAuth2JWTBearer` |
+   | Client ID / Secret | from the service key |
+   | Token Service URL | `<url>/oauth/token` |
+
+3. Call the MCP endpoint through that destination with the user's JWT (e.g. `executeHttpRequest({ destinationName, jwt: userJwt }, …)` in CAP / Cloud SDK). The destination service performs the `jwt-bearer` exchange.
+
+The calling user still needs the `SRI_ADT_Developer` or `SRI_ADT_Viewer` role collection.
+
 ## Configuration
 
 Set these as properties in `mta.yaml`, or with `cf set-env`.
